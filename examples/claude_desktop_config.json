@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "databricks": {
+      "command": "python",
+      "args": ["-m", "dbx_mcp_server.main"],
+      "env": {
+        "DATABRICKS_HOST": "https://your-workspace.cloud.databricks.com",
+        "DATABRICKS_TOKEN": "your-token-here"
+      }
+    }
+  }
+}
