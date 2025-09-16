@@ -1,8 +1,8 @@
 """
 Databricks CLI MCP Server
 
-Production-ready MCP server providing 28 comprehensive tools for Databricks automation
-across clusters, jobs, workspace, and file system operations.
+Production-ready MCP server providing 31 comprehensive tools for Databricks automation
+across clusters (including library management), jobs, workspace, and file system operations.
 """
 
 import asyncio
@@ -164,6 +164,121 @@ async def handle_list_tools() -> list[Tool]:
                     }
                 },
                 "required": ["cluster_name"],
+                "additionalProperties": False
+            }
+        ),
+        Tool(
+            name="install_libraries",
+            description="Install libraries on a Databricks cluster (Maven, PyPI, or workspace wheel files)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_id": {
+                        "type": "string",
+                        "description": "The ID of the cluster to install libraries on"
+                    },
+                    "libraries": {
+                        "type": "array",
+                        "description": "List of libraries to install",
+                        "items": {
+                            "type": "object",
+                            "description": "Library specification",
+                            "anyOf": [
+                                {
+                                    "properties": {
+                                        "maven": {
+                                            "type": "object",
+                                            "properties": {
+                                                "coordinates": {
+                                                    "type": "string",
+                                                    "description": "Maven coordinates (e.g., 'org.jsoup:jsoup:1.7.2')"
+                                                },
+                                                "repo": {
+                                                    "type": "string", 
+                                                    "description": "Optional Maven repository URL"
+                                                },
+                                                "exclusions": {
+                                                    "type": "array",
+                                                    "items": {"type": "string"},
+                                                    "description": "Optional Maven exclusions"
+                                                }
+                                            },
+                                            "required": ["coordinates"]
+                                        }
+                                    },
+                                    "required": ["maven"]
+                                },
+                                {
+                                    "properties": {
+                                        "pypi": {
+                                            "type": "object",
+                                            "properties": {
+                                                "package": {
+                                                    "type": "string",
+                                                    "description": "PyPI package name (e.g., 'pandas==1.3.0' or 'numpy')"
+                                                },
+                                                "repo": {
+                                                    "type": "string",
+                                                    "description": "Optional PyPI repository URL"
+                                                }
+                                            },
+                                            "required": ["package"]
+                                        }
+                                    },
+                                    "required": ["pypi"]
+                                },
+                                {
+                                    "properties": {
+                                        "whl": {
+                                            "type": "string",
+                                            "description": "Path to wheel file in workspace (e.g., '/Workspace/path/to/library.whl')"
+                                        }
+                                    },
+                                    "required": ["whl"]
+                                }
+                            ]
+                        }
+                    }
+                },
+                "required": ["cluster_id", "libraries"],
+                "additionalProperties": False
+            }
+        ),
+        Tool(
+            name="uninstall_libraries",
+            description="Uninstall libraries from a Databricks cluster (requires cluster restart)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_id": {
+                        "type": "string",
+                        "description": "The ID of the cluster to uninstall libraries from"
+                    },
+                    "libraries": {
+                        "type": "array",
+                        "description": "List of libraries to uninstall (same format as install_libraries)",
+                        "items": {
+                            "type": "object",
+                            "description": "Library specification to uninstall"
+                        }
+                    }
+                },
+                "required": ["cluster_id", "libraries"],
+                "additionalProperties": False
+            }
+        ),
+        Tool(
+            name="list_cluster_libraries",
+            description="List all libraries installed on a Databricks cluster with their status",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cluster_id": {
+                        "type": "string",
+                        "description": "The ID of the cluster to query libraries for"
+                    }
+                },
+                "required": ["cluster_id"],
                 "additionalProperties": False
             }
         ),
@@ -669,6 +784,30 @@ async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
             state = arguments.get("state")  # Optional state filter
             result = await clusters_cli.find_cluster_by_name(cluster_name, state)
             
+        elif name == "install_libraries":
+            cluster_id = arguments.get("cluster_id")
+            libraries = arguments.get("libraries")
+            if not cluster_id:
+                raise ValueError("cluster_id is required")
+            if not libraries:
+                raise ValueError("libraries is required")
+            result = await clusters_cli.install_libraries(cluster_id, libraries)
+            
+        elif name == "uninstall_libraries":
+            cluster_id = arguments.get("cluster_id")
+            libraries = arguments.get("libraries")
+            if not cluster_id:
+                raise ValueError("cluster_id is required")
+            if not libraries:
+                raise ValueError("libraries is required")
+            result = await clusters_cli.uninstall_libraries(cluster_id, libraries)
+            
+        elif name == "list_cluster_libraries":
+            cluster_id = arguments.get("cluster_id")
+            if not cluster_id:
+                raise ValueError("cluster_id is required")
+            result = await clusters_cli.list_cluster_libraries(cluster_id)
+            
         # Workspace operations
         elif name == "list_workspace":
             path = arguments.get("path", "/")
@@ -835,7 +974,7 @@ async def main():
     """Main server function."""
     logger.info("Starting Databricks MCP Server")
     logger.info(f"Server: {settings.mcp_server_name} v{settings.mcp_server_version}")
-    logger.info(f"Available tools: 28 (clusters, jobs, workspace, DBFS)")
+    logger.info(f"Available tools: 31 (clusters + libraries, jobs, workspace, DBFS)")
     logger.info(f"Databricks profile: {settings.databricks_profile or 'default'}")
     
     # Run the server using stdio transport

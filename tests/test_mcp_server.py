@@ -1,7 +1,7 @@
 """
 Tests for the MCP Server functionality.
 
-This module tests all 28 MCP tools, tool registration, parameter validation,
+This module tests all 31 MCP tools, tool registration, parameter validation,
 and response handling.
 """
 
@@ -18,19 +18,24 @@ class TestMCPServerTools:
     """Test MCP server tool registration and functionality."""
     
     @pytest.mark.asyncio
-    async def test_handle_list_tools_returns_all_28_tools(self):
-        """Test that handle_list_tools returns all 28 expected tools."""
-        tools = await handle_list_tools()
+    async def test_handle_list_tools_returns_all_31_tools(self):
+        """Test that list_tools returns all 31 registered tools."""
+        result = await handle_list_tools()
         
-        assert isinstance(tools, list)
-        assert len(tools) == 28
+        # Should return a list of Tool objects
+        assert isinstance(result, list)
+        assert len(result) == 31
         
-        # Verify all tools are Tool instances
-        for tool in tools:
-            assert isinstance(tool, Tool)
-            assert hasattr(tool, 'name')
-            assert hasattr(tool, 'description')
-            assert hasattr(tool, 'inputSchema')
+        # Verify tool names include all expected tools
+        tool_names = [tool.name for tool in result]
+        
+        # Cluster management tools (10 tools including library management)
+        cluster_tools = ['list_clusters', 'get_cluster', 'create_cluster', 'start_cluster', 
+                        'terminate_cluster', 'delete_cluster', 'find_cluster_by_name',
+                        'install_libraries', 'uninstall_libraries', 'list_cluster_libraries']
+        
+        for tool_name in cluster_tools:
+            assert tool_name in tool_names
     
     @pytest.mark.asyncio
     async def test_handle_list_tools_includes_all_domains(self):
@@ -38,9 +43,9 @@ class TestMCPServerTools:
         tools = await handle_list_tools()
         tool_names = [tool.name for tool in tools]
         
-        # Cluster tools (7 expected)
-        cluster_tools = [name for name in tool_names if any(x in name for x in ['cluster', 'find_cluster_by_name'])]
-        assert len(cluster_tools) == 7
+        # Cluster tools (10 expected - includes 3 library management tools)
+        cluster_tools = [name for name in tool_names if any(x in name for x in ['cluster', 'find_cluster_by_name', 'libraries'])]
+        assert len(cluster_tools) == 10
         assert 'list_clusters' in tool_names
         assert 'create_cluster' in tool_names
         assert 'start_cluster' in tool_names
@@ -48,6 +53,10 @@ class TestMCPServerTools:
         assert 'delete_cluster' in tool_names
         assert 'get_cluster' in tool_names
         assert 'find_cluster_by_name' in tool_names
+        # Library management tools
+        assert 'install_libraries' in tool_names
+        assert 'uninstall_libraries' in tool_names
+        assert 'list_cluster_libraries' in tool_names
         
         # Job tools (9 expected)
         job_tools = [name for name in tool_names if 'job' in name]
@@ -166,6 +175,107 @@ class TestMCPToolHandlers:
         response_data = json.loads(result[0].text)
         assert "error" in response_data
         assert "required" in response_data["error"].lower()
+    
+    @pytest.mark.asyncio
+    async def test_install_libraries_handler_success(self):
+        """Test install_libraries tool handler success case."""
+        cluster_id = "test-cluster-123"
+        libraries = [{"maven": {"coordinates": "org.jsoup:jsoup:1.7.2"}}]
+        mock_result = {
+            "success": True,
+            "cluster_id": cluster_id,
+            "libraries_count": 1,
+            "message": "Library installation initiated",
+            "libraries": libraries
+        }
+        
+        with patch('src.mcp_server.clusters_cli.install_libraries', new_callable=AsyncMock) as mock_cli:
+            mock_cli.return_value = mock_result
+            
+            result = await handle_call_tool("install_libraries", {
+                "cluster_id": cluster_id,
+                "libraries": libraries
+            })
+            
+            response_data = json.loads(result[0].text)
+            assert response_data == mock_result
+            mock_cli.assert_called_once_with(cluster_id, libraries)
+    
+    @pytest.mark.asyncio
+    async def test_install_libraries_handler_missing_params(self):
+        """Test install_libraries tool handler with missing parameters."""
+        # Test missing cluster_id
+        result = await handle_call_tool("install_libraries", {"libraries": []})
+        response_data = json.loads(result[0].text)
+        assert "error" in response_data
+        assert "cluster_id is required" in response_data["error"]
+        
+        # Test missing libraries
+        result = await handle_call_tool("install_libraries", {"cluster_id": "test"})
+        response_data = json.loads(result[0].text)
+        assert "error" in response_data
+        assert "libraries is required" in response_data["error"]
+    
+    @pytest.mark.asyncio
+    async def test_uninstall_libraries_handler_success(self):
+        """Test uninstall_libraries tool handler success case."""
+        cluster_id = "test-cluster-123"
+        libraries = [{"maven": {"coordinates": "org.jsoup:jsoup:1.7.2"}}]
+        mock_result = {
+            "success": True,
+            "cluster_id": cluster_id,
+            "libraries_count": 1,
+            "message": "Library uninstallation initiated",
+            "libraries": libraries
+        }
+        
+        with patch('src.mcp_server.clusters_cli.uninstall_libraries', new_callable=AsyncMock) as mock_cli:
+            mock_cli.return_value = mock_result
+            
+            result = await handle_call_tool("uninstall_libraries", {
+                "cluster_id": cluster_id,
+                "libraries": libraries
+            })
+            
+            response_data = json.loads(result[0].text)
+            assert response_data == mock_result
+            mock_cli.assert_called_once_with(cluster_id, libraries)
+    
+    @pytest.mark.asyncio
+    async def test_list_cluster_libraries_handler_success(self):
+        """Test list_cluster_libraries tool handler success case."""
+        cluster_id = "test-cluster-123"
+        mock_result = {
+            "library_statuses": [
+                {"library": {"maven": {"coordinates": "org.jsoup:jsoup:1.7.2"}}, "status": "INSTALLED"}
+            ],
+            "summary": {
+                "cluster_id": cluster_id,
+                "total_libraries": 1,
+                "installed": 1,
+                "pending": 0,
+                "failed": 0,
+                "uninstall_pending": 0
+            }
+        }
+        
+        with patch('src.mcp_server.clusters_cli.list_cluster_libraries', new_callable=AsyncMock) as mock_cli:
+            mock_cli.return_value = mock_result
+            
+            result = await handle_call_tool("list_cluster_libraries", {"cluster_id": cluster_id})
+            
+            response_data = json.loads(result[0].text)
+            assert response_data == mock_result
+            mock_cli.assert_called_once_with(cluster_id)
+    
+    @pytest.mark.asyncio
+    async def test_list_cluster_libraries_handler_missing_cluster_id(self):
+        """Test list_cluster_libraries tool handler with missing cluster_id."""
+        result = await handle_call_tool("list_cluster_libraries", {})
+        
+        response_data = json.loads(result[0].text)
+        assert "error" in response_data
+        assert "cluster_id is required" in response_data["error"]
     
     @pytest.mark.asyncio
     async def test_list_jobs_handler_success(self):

@@ -226,6 +226,162 @@ class ClustersCLI(DatabricksCLI):
             "total_matches": len(matching_clusters)
         }
 
+    async def install_libraries(
+        self, 
+        cluster_id: str, 
+        libraries: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Install libraries on a Databricks cluster.
+        
+        Args:
+            cluster_id: Target cluster ID
+            libraries: List of library specifications (maven, wheel, pypi, etc.)
+        
+        Returns:
+            Dictionary containing installation result
+            
+        Example libraries format:
+        [
+            {"maven": {"coordinates": "org.jsoup:jsoup:1.7.2"}},
+            {"wheel": "/Workspace/path/to/library.whl"},
+            {"pypi": {"package": "pandas==1.3.0"}}
+        ]
+        """
+        logger.info(f"Installing libraries on cluster {cluster_id}")
+        
+        # Validate cluster_id
+        if not cluster_id:
+            raise ValueError("cluster_id is required")
+            
+        # Validate libraries
+        if not libraries or not isinstance(libraries, list):
+            raise ValueError("libraries must be a non-empty list")
+        
+        # Prepare the request body
+        request_body = {
+            "cluster_id": cluster_id,
+            "libraries": libraries
+        }
+        
+        command_args = [
+            "libraries", "install",
+            "--json", json.dumps(request_body),
+            "--output", "json"
+        ]
+        
+        result = await self.execute(command_args, expect_json=False)
+        
+        return {
+            "success": True,
+            "cluster_id": cluster_id,
+            "libraries_count": len(libraries),
+            "message": "Library installation initiated (asynchronous operation)",
+            "libraries": libraries
+        }
+
+    async def uninstall_libraries(
+        self, 
+        cluster_id: str, 
+        libraries: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Uninstall libraries from a Databricks cluster.
+        
+        Args:
+            cluster_id: Target cluster ID
+            libraries: List of library specifications to uninstall
+        
+        Returns:
+            Dictionary containing uninstallation result
+        """
+        logger.info(f"Uninstalling libraries from cluster {cluster_id}")
+        
+        # Validate cluster_id
+        if not cluster_id:
+            raise ValueError("cluster_id is required")
+            
+        # Validate libraries
+        if not libraries or not isinstance(libraries, list):
+            raise ValueError("libraries must be a non-empty list")
+        
+        # Prepare the request body
+        request_body = {
+            "cluster_id": cluster_id,
+            "libraries": libraries
+        }
+        
+        command_args = [
+            "libraries", "uninstall",
+            "--json", json.dumps(request_body),
+            "--output", "json"
+        ]
+        
+        result = await self.execute(command_args, expect_json=False)
+        
+        return {
+            "success": True,
+            "cluster_id": cluster_id,
+            "libraries_count": len(libraries),
+            "message": "Library uninstallation initiated (requires cluster restart)",
+            "libraries": libraries
+        }
+
+    async def list_cluster_libraries(self, cluster_id: str) -> Dict[str, Any]:
+        """
+        List all libraries installed on a Databricks cluster.
+        
+        Args:
+            cluster_id: Cluster ID to query
+        
+        Returns:
+            Dictionary containing library status information
+        """
+        logger.info(f"Listing libraries for cluster {cluster_id}")
+        
+        # Validate cluster_id
+        if not cluster_id:
+            raise ValueError("cluster_id is required")
+        
+        command_args = [
+            "libraries", "cluster-status", cluster_id,
+            "--output", "json"
+        ]
+        
+        result = await self.execute(command_args)
+        
+        # Parse and enhance the response
+        # Handle the CLI response format - it returns a list directly
+        if isinstance(result, list):
+            library_statuses = result
+        else:
+            library_statuses = result.get("library_statuses", [])
+        
+        summary = {
+            "cluster_id": cluster_id,
+            "total_libraries": len(library_statuses),
+            "installed": 0,
+            "pending": 0,
+            "failed": 0,
+            "uninstall_pending": 0
+        }
+        
+        for lib_status in library_statuses:
+            status = lib_status.get("status", "").lower()
+            if "installed" in status:
+                summary["installed"] += 1
+            elif "uninstall" in status:
+                summary["uninstall_pending"] += 1
+            elif "pending" in status:
+                summary["pending"] += 1
+            elif "failed" in status:
+                summary["failed"] += 1
+        
+        return {
+            "library_statuses": library_statuses,
+            "summary": summary
+        }
+
 
 # Create a global instance for easy importing
 clusters_cli = ClustersCLI()
