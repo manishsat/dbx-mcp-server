@@ -67,10 +67,10 @@ def cli_main() -> None:
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\nShutdown requested by user")
+        print("\nShutdown requested by user", file=sys.stderr)
         sys.exit(0)
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Unexpected error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
