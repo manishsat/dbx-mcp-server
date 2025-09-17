@@ -23,7 +23,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Listing workspace items at path: {path}")
         
         command_args = [
-            "databricks", "workspace", "list",
+            "workspace", "list",
             path,
             "--output", "json"
         ]
@@ -45,7 +45,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Getting workspace item: {path}")
         
         command_args = [
-            "databricks", "workspace", "get-status",
+            "workspace", "get-status",
             path,
             "--output", "json"
         ]
@@ -63,7 +63,7 @@ class WorkspaceCLI(DatabricksCLI):
         
         try:
             command_args = [
-                "databricks", "workspace", "import", path,
+                "workspace", "import", path,
                 "--file", temp_file_path,
                 "--language", language.upper(),
                 "--format", format_type.upper(),
@@ -92,7 +92,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Uploading notebook from {local_path} to {workspace_path}")
         
         command_args = [
-            "databricks", "workspace", "import", workspace_path,
+            "workspace", "import", workspace_path,
             "--file", local_path,
             "--language", language.upper(),
             "--format", "SOURCE",
@@ -113,7 +113,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Deleting workspace item: {path}")
         
         command_args = [
-            "databricks", "workspace", "delete",
+            "workspace", "delete",
             path
         ]
         
@@ -133,7 +133,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Creating workspace directory: {path}")
         
         command_args = [
-            "databricks", "workspace", "mkdirs",
+            "workspace", "mkdirs",
             path
         ]
         
@@ -150,7 +150,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info(f"Exporting notebook from {workspace_path} to {local_path}")
         
         command_args = [
-            "databricks", "workspace", "export",
+            "workspace", "export",
             workspace_path,
             local_path,
             "--format", format_type.upper()
@@ -170,7 +170,7 @@ class WorkspaceCLI(DatabricksCLI):
         logger.info("Getting current user information")
         
         command_args = [
-            "databricks", "current-user", "me",
+            "current-user", "me",
             "--output", "json"
         ]
         
