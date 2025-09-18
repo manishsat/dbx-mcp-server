@@ -70,14 +70,22 @@ class WorkspaceCLI(DatabricksCLI):
                 "--overwrite"
             ]
             
-            result = await self.execute(command_args)
+            try:
+                await self.execute(command_args)
+            except Exception as e:
+                # Check if it's just a "no data returned" issue (which is actually success)
+                if "No data returned" in str(e) and "exit code 0" in str(e):
+                    # This is actually success - import commands don't return data
+                    pass
+                else:
+                    raise e
             
-            # The import command typically returns success without output
             return {
                 "path": path,
                 "language": language,
                 "format": format_type,
-                "status": "created"
+                "status": "successfully created",
+                "message": f"Notebook created at {path}"
             }
             
         finally:
@@ -99,13 +107,22 @@ class WorkspaceCLI(DatabricksCLI):
             "--overwrite"
         ]
         
-        await self.execute(command_args)
+        try:
+            await self.execute(command_args)
+        except Exception as e:
+            # Check if it's just a "no data returned" issue (which is actually success for import)
+            if "No data returned" in str(e) and "exit code 0" in str(e):
+                # This is actually success - import commands don't return data
+                pass
+            else:
+                raise e
         
         return {
             "local_path": local_path,
             "workspace_path": workspace_path,
             "language": language,
-            "status": "uploaded"
+            "status": "successfully uploaded",
+            "message": f"Notebook uploaded from {local_path} to {workspace_path}"
         }
     
     async def delete_workspace_item(self, path: str, recursive: bool = False) -> Dict[str, Any]:
@@ -120,12 +137,21 @@ class WorkspaceCLI(DatabricksCLI):
         if recursive:
             command_args.extend(["--recursive"])
         
-        await self.execute(command_args)
+        try:
+            await self.execute(command_args)
+        except Exception as e:
+            # Check if it's just a "no data returned" issue (which is actually success)
+            if "No data returned" in str(e) and "exit code 0" in str(e):
+                # This is actually success - delete commands don't return data
+                pass
+            else:
+                raise e
         
         return {
             "path": path,
-            "status": "deleted",
-            "recursive": recursive
+            "status": "successfully deleted",
+            "recursive": recursive,
+            "message": f"Workspace item {path} deleted successfully"
         }
     
     async def create_directory(self, path: str) -> Dict[str, Any]:
@@ -137,12 +163,21 @@ class WorkspaceCLI(DatabricksCLI):
             path
         ]
         
-        await self.execute(command_args)
+        try:
+            await self.execute(command_args)
+        except Exception as e:
+            # Check if it's just a "no data returned" issue (which is actually success)
+            if "No data returned" in str(e) and "exit code 0" in str(e):
+                # This is actually success - mkdirs commands don't return data
+                pass
+            else:
+                raise e
         
         return {
             "path": path,
-            "status": "created",
-            "type": "directory"
+            "status": "successfully created",
+            "type": "directory",
+            "message": f"Directory {path} created successfully"
         }
     
     async def export_notebook(self, workspace_path: str, local_path: str, format_type: str = "SOURCE") -> Dict[str, Any]:
@@ -156,13 +191,22 @@ class WorkspaceCLI(DatabricksCLI):
             "--format", format_type.upper()
         ]
         
-        await self.execute(command_args)
+        try:
+            await self.execute(command_args)
+        except Exception as e:
+            # Check if it's just a "no data returned" issue (which is actually success)
+            if "No data returned" in str(e) and "exit code 0" in str(e):
+                # This is actually success - export commands don't return data
+                pass
+            else:
+                raise e
         
         return {
             "workspace_path": workspace_path,
             "local_path": local_path,
             "format": format_type,
-            "status": "exported"
+            "status": "successfully exported",
+            "message": f"Notebook exported from {workspace_path} to {local_path}"
         }
     
     async def get_current_user_info(self) -> Dict[str, Any]:
