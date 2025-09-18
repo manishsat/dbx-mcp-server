@@ -1,7 +1,7 @@
 """
 Tests for the MCP Server functionality.
 
-This module tests all 31 MCP tools, tool registration, parameter validation,
+This module tests all 33 MCP tools, tool registration, parameter validation,
 and response handling.
 """
 
@@ -18,13 +18,13 @@ class TestMCPServerTools:
     """Test MCP server tool registration and functionality."""
     
     @pytest.mark.asyncio
-    async def test_handle_list_tools_returns_all_31_tools(self):
-        """Test that list_tools returns all 31 registered tools."""
+    async def test_handle_list_tools_returns_all_33_tools(self):
+        """Test that list_tools returns all 33 registered tools."""
         result = await handle_list_tools()
         
         # Should return a list of Tool objects
         assert isinstance(result, list)
-        assert len(result) == 31
+        assert len(result) == 33
         
         # Verify tool names include all expected tools
         tool_names = [tool.name for tool in result]
@@ -58,9 +58,9 @@ class TestMCPServerTools:
         assert 'uninstall_libraries' in tool_names
         assert 'list_cluster_libraries' in tool_names
         
-        # Job tools (9 expected)
+        # Job tools (11 expected - includes 2 new debugging tools)
         job_tools = [name for name in tool_names if 'job' in name]
-        assert len(job_tools) == 9
+        assert len(job_tools) == 11
         assert 'list_jobs' in tool_names
         assert 'create_job' in tool_names
         assert 'run_job' in tool_names
@@ -70,6 +70,9 @@ class TestMCPServerTools:
         assert 'cancel_job_run' in tool_names
         assert 'get_job_run' in tool_names
         assert 'list_job_runs' in tool_names
+        # New debugging tools
+        assert 'get_job_run_output' in tool_names
+        assert 'export_job_run' in tool_names
         
         # Workspace tools (8 expected)
         workspace_tools = [name for name in tool_names if any(x in name for x in ['workspace', 'notebook', 'user_workspace'])]
@@ -305,6 +308,66 @@ class TestMCPToolHandlers:
             response_data = json.loads(result[0].text)
             assert response_data == mock_run_data
             mock_cli.assert_called_once_with(job_id, None, None)
+    
+    @pytest.mark.asyncio
+    async def test_get_job_run_output_handler_success(self):
+        """Test get_job_run_output tool handler for debugging failed jobs."""
+        run_id = "456"
+        mock_output_data = {
+            "notebook_output": {
+                "result": "",
+                "truncated": False
+            },
+            "error": "Exception: Database connection failed",
+            "error_trace": "Traceback (most recent call last):\n  File ...",
+            "logs": "2024-01-01 10:00:00 INFO Starting job...\n2024-01-01 10:00:01 ERROR Connection failed"
+        }
+        
+        with patch('src.mcp_server.jobs_cli.get_job_run_output', new_callable=AsyncMock) as mock_cli:
+            mock_cli.return_value = mock_output_data
+            
+            result = await handle_call_tool("get_job_run_output", {"run_id": run_id})
+            
+            response_data = json.loads(result[0].text)
+            assert response_data == mock_output_data
+            mock_cli.assert_called_once_with(run_id)
+    
+    @pytest.mark.asyncio
+    async def test_export_job_run_handler_success(self):
+        """Test export_job_run tool handler for comprehensive debugging."""
+        run_id = "456"
+        mock_export_data = {
+            "views": [
+                {
+                    "content": "# Databricks notebook source\nprint('Hello world')",
+                    "type": "NOTEBOOK",
+                    "name": "main_notebook"
+                }
+            ],
+            "run_id": run_id,
+            "views_to_export": "ALL"
+        }
+        
+        with patch('src.mcp_server.jobs_cli.export_job_run', new_callable=AsyncMock) as mock_cli:
+            mock_cli.return_value = mock_export_data
+            
+            result = await handle_call_tool("export_job_run", {
+                "run_id": run_id, 
+                "views_to_export": "ALL"
+            })
+            
+            response_data = json.loads(result[0].text)
+            assert response_data == mock_export_data
+            mock_cli.assert_called_once_with(run_id, "ALL")
+    
+    @pytest.mark.asyncio
+    async def test_get_job_run_output_handler_missing_run_id(self):
+        """Test get_job_run_output tool handler with missing run_id."""
+        result = await handle_call_tool("get_job_run_output", {})
+        
+        response_data = json.loads(result[0].text)
+        assert "error" in response_data
+        assert "run_id is required" in response_data["error"]
     
     @pytest.mark.asyncio
     async def test_list_workspace_handler_success(self):

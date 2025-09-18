@@ -314,6 +314,64 @@ class JobsCLI(DatabricksCLI):
             "--json", job_json,
             "--output", "json"
         ]
+        
+        return await self.execute(command_args)
+
+    async def get_job_run_output(self, run_id: str) -> Dict[str, Any]:
+        """
+        Get the output and logs for a job run.
+        
+        This is crucial for debugging failed job runs as it provides:
+        - Task execution output (first 5MB)
+        - Error messages and stack traces
+        - Return values from notebook tasks
+        - Execution metadata
+        
+        Args:
+            run_id: ID of the job run to get output for
+            
+        Returns:
+            Dictionary containing run output, logs, and error information
+        """
+        logger.info(f"Getting job run output for: {run_id}")
+        
+        self.validate_required_args({"run_id": run_id}, ["run_id"])
+        
+        command_args = ["jobs", "get-run-output", run_id, "--output", "json"]
+        return await self.execute(command_args)
+
+    async def export_job_run(self, run_id: str, views_to_export: str = "ALL") -> Dict[str, Any]:
+        """
+        Export and retrieve a job run for detailed debugging.
+        
+        This provides comprehensive information about the job run including:
+        - Complete task definitions and configurations
+        - Execution details and environment information
+        - Notebook code (if CODE or ALL views selected)
+        - Dashboard outputs (if DASHBOARDS or ALL views selected)
+        
+        Args:
+            run_id: ID of the job run to export
+            views_to_export: Which views to export (CODE, DASHBOARDS, or ALL)
+            
+        Returns:
+            Dictionary containing exported job run information
+        """
+        logger.info(f"Exporting job run: {run_id} (views: {views_to_export})")
+        
+        self.validate_required_args({"run_id": run_id}, ["run_id"])
+        
+        # Validate views_to_export parameter
+        valid_views = ["CODE", "DASHBOARDS", "ALL"]
+        if views_to_export.upper() not in valid_views:
+            raise ValueError(f"views_to_export must be one of: {valid_views}")
+        
+        command_args = [
+            "jobs", "export-run", run_id,
+            "--views-to-export", views_to_export.upper(),
+            "--output", "json"
+        ]
+        
         return await self.execute(command_args)
 
 

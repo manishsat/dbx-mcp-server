@@ -1,8 +1,8 @@
 """
 Databricks CLI MCP Server
 
-Production-ready MCP server providing 31 comprehensive tools for Databricks automation
-across clusters (including library management), jobs, workspace, and file system operations.
+Production-ready MCP server providing 33 comprehensive tools for Databricks automation
+across clusters (including library management), jobs (including debugging), workspace, and file system operations.
 """
 
 import asyncio
@@ -582,13 +582,49 @@ async def handle_list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_job_run",
-            description="Get details and status of a specific job run",
+            description="Get details and status of a job run, including task structure for multi-task jobs. Use this first to identify individual task run IDs for debugging failed tasks.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "run_id": {
                         "type": "string",
-                        "description": "The ID of the job run to retrieve"
+                        "description": "The job run ID (not task run ID) to retrieve details for"
+                    }
+                },
+                "required": ["run_id"],
+                "additionalProperties": False
+            }
+        ),
+        Tool(
+            name="get_job_run_output",
+            description="Get output, logs, and error details from a job run for debugging. For multi-task jobs, use individual task run IDs (found in get_job_run response) rather than the job run ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "run_id": {
+                        "type": "string",
+                        "description": "The ID of the job run to get output and logs for"
+                    }
+                },
+                "required": ["run_id"],
+                "additionalProperties": False
+            }
+        ),
+        Tool(
+            name="export_job_run",
+            description="Export comprehensive job run information including code, configuration, and metadata. For multi-task jobs that failed, first use get_job_run to identify failed tasks, then use this tool with task run IDs for detailed debugging.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "run_id": {
+                        "type": "string",
+                        "description": "The ID of the job run to export"
+                    },
+                    "views_to_export": {
+                        "type": "string",
+                        "description": "Which views to export (CODE, DASHBOARDS, or ALL) - default: ALL",
+                        "enum": ["CODE", "DASHBOARDS", "ALL"],
+                        "default": "ALL"
                     }
                 },
                 "required": ["run_id"],
@@ -916,6 +952,19 @@ async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
                 raise ValueError("run_id is required")
             result = await jobs_cli.get_job_run(run_id)
             
+        elif name == "get_job_run_output":
+            run_id = arguments.get("run_id")
+            if not run_id:
+                raise ValueError("run_id is required")
+            result = await jobs_cli.get_job_run_output(run_id)
+            
+        elif name == "export_job_run":
+            run_id = arguments.get("run_id")
+            views_to_export = arguments.get("views_to_export", "ALL")
+            if not run_id:
+                raise ValueError("run_id is required")
+            result = await jobs_cli.export_job_run(run_id, views_to_export)
+            
         elif name == "list_job_runs":
             job_id = arguments.get("job_id")  # Optional
             limit = arguments.get("limit", 25)
@@ -974,7 +1023,7 @@ async def main():
     """Main server function."""
     logger.info("Starting Databricks MCP Server")
     logger.info(f"Server: {settings.mcp_server_name} v{settings.mcp_server_version}")
-    logger.info(f"Available tools: 31 (clusters + libraries, jobs, workspace, DBFS)")
+    logger.info(f"Available tools: 33 (clusters + libraries, jobs + debugging, workspace, DBFS)")
     logger.info(f"Databricks profile: {settings.databricks_profile or 'default'}")
     
     # Run the server using stdio transport
