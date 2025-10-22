@@ -166,34 +166,42 @@ class JobsCLI(DatabricksCLI):
     
     async def update_job(self, job_id: str, job_config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Update an existing job.
+        Update an existing job's configuration.
+        
+        This method handles the Databricks CLI requirement that job_id must be
+        included in the JSON payload when using the --json flag, not as a positional argument.
         
         Args:
-            job_id: ID of the job to update
-            job_config: Updated job configuration
+            job_id: ID of the job to update (will be added to JSON automatically)
+            job_config: Updated job configuration (should NOT contain job_id)
             
         Returns:
             Dictionary containing operation result
+            
+        Note:
+            The job_id is automatically added to the job_config before sending to CLI.
+            This resolves the CLI error: "when --json flag is specified, no positional 
+            arguments are required. Provide 'job_id' in your JSON input"
         """
         logger.info(f"Updating job: {job_id}")
         
         self.validate_required_args({"job_id": job_id}, ["job_id"])
         
-        # Remove job_id from job_config if it exists (CLI expects it as positional arg only)
-        config_copy = job_config.copy()
-        if "job_id" in config_copy:
-            logger.debug(f"Removing job_id from config as it's provided as positional argument")
-            del config_copy["job_id"]
-        
-        job_json = json.dumps(config_copy)
+        # Databricks CLI expects job_id and new_settings structure when using --json flag
+        config_with_id = {
+            "job_id": job_id,
+            "new_settings": job_config
+        }
+        job_json = json.dumps(config_with_id)
         
         command_args = [
-            "jobs", "update", 
-            job_id,  # JOB_ID as positional argument
-            "--json", job_json,
-            "--output", "json"
+            "jobs", "update",
+            "--json", job_json
         ]
-        return await self.execute(command_args)
+        # Update commands don't return JSON output, so we don't expect JSON
+        result = await self.execute(command_args, expect_json=False)
+        # Return success message since update operations succeed silently
+        return {"success": True, "message": f"Job {job_id} updated successfully"}
     
     async def run_job(self, job_id: str, parameters: Optional[Dict[str, Any]] = None, 
                       idempotency_token: Optional[str] = None) -> Dict[str, Any]:

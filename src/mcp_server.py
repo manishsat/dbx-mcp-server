@@ -510,17 +510,17 @@ async def handle_list_tools() -> list[Tool]:
         ),
         Tool(
             name="update_job",
-            description="Update an existing job's configuration",
+            description="Update an existing job's configuration. Use this to modify job settings like schedule, pause/unpause jobs, update tasks, etc. The job_id should NOT be included in the job_config - provide it as a separate parameter.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "job_id": {
                         "type": "string",
-                        "description": "The ID of the job to update"
+                        "description": "The ID of the job to update (provide as separate parameter, not in job_config)"
                     },
                     "job_config": {
                         "type": "object",
-                        "description": "Updated job configuration as JSON object"
+                        "description": "Updated job configuration as JSON object. Do NOT include job_id in this object - it will be added automatically. Examples: {\"schedule\": {\"pause_status\": \"UNPAUSED\"}}, {\"max_concurrent_runs\": 2}, {\"tasks\": [...]}"
                     }
                 },
                 "required": ["job_id", "job_config"],
