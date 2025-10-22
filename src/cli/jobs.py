@@ -179,7 +179,13 @@ class JobsCLI(DatabricksCLI):
         
         self.validate_required_args({"job_id": job_id}, ["job_id"])
         
-        job_json = json.dumps(job_config)
+        # Remove job_id from job_config if it exists (CLI expects it as positional arg only)
+        config_copy = job_config.copy()
+        if "job_id" in config_copy:
+            logger.debug(f"Removing job_id from config as it's provided as positional argument")
+            del config_copy["job_id"]
+        
+        job_json = json.dumps(config_copy)
         
         command_args = [
             "jobs", "update", 
