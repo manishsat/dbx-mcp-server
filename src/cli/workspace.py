@@ -96,14 +96,26 @@ class WorkspaceCLI(DatabricksCLI):
                 pass
     
     async def upload_notebook(self, local_path: str, workspace_path: str, language: str = "PYTHON") -> Dict[str, Any]:
-        """Upload a local notebook file to workspace."""
+        """Upload a local notebook file to workspace.
+        
+        Automatically detects file format:
+        - .ipynb files use JUPYTER format (preserves Jupyter notebook structure)
+        - .py files use SOURCE format (converts Python code to notebook)
+        """
         logger.info(f"Uploading notebook from {local_path} to {workspace_path}")
+        
+        # Auto-detect format based on file extension
+        import os
+        file_ext = os.path.splitext(local_path)[1].lower()
+        format_type = "JUPYTER" if file_ext == ".ipynb" else "SOURCE"
+        
+        logger.info(f"Detected file format: {format_type} (extension: {file_ext})")
         
         command_args = [
             "workspace", "import", workspace_path,
             "--file", local_path,
             "--language", language.upper(),
-            "--format", "SOURCE",
+            "--format", format_type,
             "--overwrite"
         ]
         
@@ -121,8 +133,9 @@ class WorkspaceCLI(DatabricksCLI):
             "local_path": local_path,
             "workspace_path": workspace_path,
             "language": language,
+            "format": format_type,
             "status": "successfully uploaded",
-            "message": f"Notebook uploaded from {local_path} to {workspace_path}"
+            "message": f"Notebook uploaded from {local_path} to {workspace_path} using {format_type} format"
         }
     
     async def delete_workspace_item(self, path: str, recursive: bool = False) -> Dict[str, Any]:
